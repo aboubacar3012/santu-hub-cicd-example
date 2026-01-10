@@ -21,13 +21,18 @@ function readHostFile(path: string, fallback: () => string): string {
     try {
       const proc1RootPath = `/proc/1/root${path}`;
       if (fs.existsSync(proc1RootPath)) {
-        const content = fs.readFileSync(proc1RootPath, "utf-8");
-        if (content && content.trim().length > 0) {
-          console.log(`✓ Lecture depuis /proc/1/root: ${path}`);
-          return content.trim();
+        const stats = fs.statSync(proc1RootPath);
+        // Vérifier que c'est un fichier (pas un répertoire)
+        if (stats.isFile()) {
+          const content = fs.readFileSync(proc1RootPath, "utf-8");
+          if (content && content.trim().length > 0) {
+            console.log(`✓ Lecture depuis /proc/1/root: ${path} (${content.length} bytes)`);
+            return content.trim();
+          }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.log(`✗ Erreur lecture /proc/1/root${path}: ${error.message}`);
       // Continuer avec les autres méthodes
     }
   }
@@ -38,28 +43,35 @@ function readHostFile(path: string, fallback: () => string): string {
   if (isHostMounted()) {
     try {
       if (fs.existsSync(hostPath)) {
-        const content = fs.readFileSync(hostPath, "utf-8");
-        if (content && content.trim().length > 0) {
-          console.log(`✓ Lecture depuis l'hôte (volume): ${hostPath}`);
-          return content.trim();
+        const stats = fs.statSync(hostPath);
+        // Vérifier que c'est un fichier (pas un répertoire)
+        if (stats.isFile()) {
+          const content = fs.readFileSync(hostPath, "utf-8");
+          if (content && content.trim().length > 0) {
+            console.log(`✓ Lecture depuis l'hôte (volume): ${hostPath} (${content.length} bytes)`);
+            return content.trim();
+          }
         }
       }
-    } catch (error) {
-      console.log(`✗ Erreur lecture ${hostPath}:`, error);
+    } catch (error: any) {
+      console.log(`✗ Erreur lecture ${hostPath}: ${error.message}`);
     }
   }
   
   // Fallback: lire depuis le conteneur
   try {
     if (fs.existsSync(path)) {
-      const content = fs.readFileSync(path, "utf-8");
-      if (content && content.trim().length > 0) {
-        console.log(`⚠ Lecture depuis le conteneur: ${path}`);
-        return content.trim();
+      const stats = fs.statSync(path);
+      if (stats.isFile()) {
+        const content = fs.readFileSync(path, "utf-8");
+        if (content && content.trim().length > 0) {
+          console.log(`⚠ Lecture depuis le conteneur: ${path} (${content.length} bytes)`);
+          return content.trim();
+        }
       }
     }
-  } catch (error) {
-    console.log(`✗ Erreur lecture ${path}:`, error);
+  } catch (error: any) {
+    console.log(`✗ Erreur lecture ${path}: ${error.message}`);
   }
   
   return fallback();
@@ -407,6 +419,7 @@ function getHostArch(): string {
 
 // Fonction pour obtenir l'IP de l'hôte
 function getHostIP(): string {
+  console.log("=== Début de la récupération de l'IP ===");
   try {
     // Méthode 0: Essayer d'utiliser hostname -i (le plus fiable avec --pid host)
     // Note: Alpine Linux peut ne pas avoir hostname avec l'option -i
@@ -438,35 +451,50 @@ function getHostIP(): string {
     }
     
     // Méthode 0.1: Essayer ip addr show (plus universel que hostname -i)
+    console.log("Méthode 0.1: Essai avec ip addr show");
     try {
-      if (fs.existsSync("/proc/1/root")) {
-        // Vérifier si ip est disponible
-        try {
-          execSync("which ip 2>/dev/null", { encoding: "utf-8", timeout: 1000 });
-        } catch {
-          throw new Error("ip command not found");
-        }
-        
-        // Utiliser ip addr show pour lister les IPs
-        const ipOutput = execSync("ip -4 addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1", { 
-          encoding: "utf-8", 
-          timeout: 2000 
-        }).trim();
-        
-        if (ipOutput) {
-          // Format: inet 192.168.0.19/24 brd 192.168.0.255 scope global eth0
-          const ipMatch = ipOutput.match(/inet\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
-          if (ipMatch && ipMatch[1]) {
-            const ip = ipMatch[1];
-            if (ip !== "127.0.0.1" && !ip.startsWith("172.17.") && !ip.startsWith("172.18.") && !ip.startsWith("172.19.")) {
-              console.log(`✓ IP depuis ip addr show: ${ip}`);
-              return ip;
-            }
+      // Vérifier si ip est disponible
+      try {
+        execSync("which ip 2>/dev/null", { encoding: "utf-8", timeout: 1000 });
+        console.log("  Commande 'ip' trouvée");
+      } catch {
+        throw new Error("ip command not found");
+      }
+      
+      // Utiliser ip addr show pour lister les IPs
+      // Avec --pid host, on peut exécuter directement dans l'espace de noms de l'hôte
+      const ipOutput = execSync("ip -4 addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1", { 
+        encoding: "utf-8", 
+        timeout: 2000 
+      }).trim();
+      
+      console.log(`  ip addr show output: "${ipOutput}"`);
+      
+      if (ipOutput) {
+        // Format: inet 192.168.0.19/24 brd 192.168.0.255 scope global eth0
+        const ipMatch = ipOutput.match(/inet\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+        if (ipMatch && ipMatch[1]) {
+          const ip = ipMatch[1];
+          // Filtrer les IPs Docker
+          const ipParts = ip.split(".");
+          const firstOctet = parseInt(ipParts[0]);
+          const secondOctet = parseInt(ipParts[1]);
+          const isDockerIP = firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31;
+          
+          if (ip !== "127.0.0.1" && !isDockerIP) {
+            console.log(`✓ IP depuis ip addr show: ${ip}`);
+            return ip;
+          } else {
+            console.log(`  IP rejetée (Docker ou loopback): ${ip}`);
           }
         }
+      } else {
+        console.log("  ip addr show n'a retourné aucune sortie");
       }
     } catch (e: any) {
-      console.log(`ip addr show failed or not available: ${e.message}`);
+      console.log(`  ip addr show failed: ${e.message}`);
+      if (e.stdout) console.log(`  stdout: ${e.stdout}`);
+      if (e.stderr) console.log(`  stderr: ${e.stderr}`);
     }
     
     // Méthode 0.5: Lire depuis /sys/class/net pour trouver les interfaces et leurs IPs
@@ -495,35 +523,35 @@ function getHostIP(): string {
     }
     
     // Méthode 1: Lire depuis /proc/net/fib_trie (contient toutes les IPs locales)
+    console.log("Méthode 1: Lecture de /proc/net/fib_trie");
     let fibTrie = readHostFile("/proc/net/fib_trie", () => "");
+    console.log(`fib_trie length: ${fibTrie ? fibTrie.length : 0}`);
+    
     if (fibTrie && fibTrie.length > 0) {
       // Parser fib_trie pour trouver les IPs locales
       // Chercher les lignes avec "LOCAL" qui indiquent les IPs locales
       const lines = fibTrie.split("\n");
       const localIPs: string[] = [];
       
+      // Chercher toutes les IPs dans le fichier (pas seulement celles avec LOCAL)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        // Chercher les lignes qui contiennent "LOCAL" et une IP
-        if (line.includes("LOCAL")) {
-          // L'IP est généralement sur la ligne précédente ou dans la même ligne
-          const ipMatch = line.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
-          if (ipMatch) {
-            const ip = ipMatch[1];
-            // Filtrer les IPs invalides
-            if (ip !== "127.0.0.1" && ip !== "0.0.0.0" && !ip.startsWith("172.17.") && !ip.startsWith("172.18.") && !ip.startsWith("172.19.")) {
+        
+        // Chercher toutes les IPs dans chaque ligne
+        const ipMatches = line.matchAll(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/g);
+        for (const match of ipMatches) {
+          const ip = match[1];
+          // Filtrer les IPs invalides
+          if (ip !== "127.0.0.1" && ip !== "0.0.0.0") {
+            // Filtrer les IPs Docker (172.16.0.0/12)
+            const ipParts = ip.split(".");
+            const firstOctet = parseInt(ipParts[0]);
+            const secondOctet = parseInt(ipParts[1]);
+            const isDockerIP = firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31;
+            
+            if (!isDockerIP && !localIPs.includes(ip)) {
               localIPs.push(ip);
-            }
-          }
-          // Aussi chercher dans les lignes précédentes
-          if (i > 0) {
-            const prevLine = lines[i - 1];
-            const prevIpMatch = prevLine.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
-            if (prevIpMatch) {
-              const ip = prevIpMatch[1];
-              if (ip !== "127.0.0.1" && ip !== "0.0.0.0" && !ip.startsWith("172.17.") && !ip.startsWith("172.18.") && !ip.startsWith("172.19.")) {
-                localIPs.push(ip);
-              }
+              console.log(`  Trouvé IP dans fib_trie: ${ip}`);
             }
           }
         }
@@ -534,14 +562,23 @@ function getHostIP(): string {
         // Préférer les IPs dans les plages privées communes (192.168.x.x, 10.x.x.x)
         const privateIP = localIPs.find(ip => ip.startsWith("192.168.") || ip.startsWith("10."));
         if (privateIP) {
+          console.log(`✓ IP depuis fib_trie (privée): ${privateIP}`);
           return privateIP;
         }
+        console.log(`✓ IP depuis fib_trie: ${localIPs[0]}`);
         return localIPs[0];
+      } else {
+        console.log("  Aucune IP valide trouvée dans fib_trie");
       }
+    } else {
+      console.log("  fib_trie est vide ou inaccessible");
     }
     
     // Méthode 2: Lire depuis /proc/net/route pour trouver l'interface principale puis son IP
+    console.log("Méthode 2: Lecture de /proc/net/route");
     const route = readHostFile("/proc/net/route", () => "");
+    console.log(`route length: ${route ? route.length : 0}`);
+    
     if (route && route.length > 0) {
       const lines = route.split("\n");
       // Chercher la première interface non-loopback avec une route par défaut
@@ -635,19 +672,22 @@ function getHostIP(): string {
         return arpIPs[0];
       }
     }
-  } catch (error) {
-    console.log("Erreur lors de la récupération de l'IP:", error);
+  } catch (error: any) {
+    console.log(`Erreur lors de la récupération de l'IP: ${error.message}`);
+    console.log(error.stack);
   }
   
   // Fallback: utiliser l'IP du conteneur (si on ne peut pas accéder à l'hôte)
   // Mais filtrer les IPs Docker
-  console.log("Trying fallback: os.networkInterfaces()");
+  console.log("Méthode Fallback: os.networkInterfaces()");
   const interfaces = os.networkInterfaces();
+  console.log(`Nombre d'interfaces: ${Object.keys(interfaces || {}).length}`);
+  
   for (const name of Object.keys(interfaces || {})) {
     const iface = interfaces![name];
     if (iface) {
       for (const addr of iface) {
-        console.log(`Checking interface ${name}: ${addr.address} (internal: ${addr.internal}, family: ${addr.family})`);
+        console.log(`  Interface ${name}: ${addr.address} (internal: ${addr.internal}, family: ${addr.family})`);
         if (addr.family === "IPv4" && !addr.internal) {
           // Filtrer les IPs Docker (172.16.0.0/12)
           const ipParts = addr.address.split(".");
@@ -660,13 +700,16 @@ function getHostIP(): string {
           if (!isDockerIP && addr.address !== "127.0.0.1") {
             console.log(`✓ IP depuis fallback (os.networkInterfaces): ${addr.address}`);
             return addr.address;
+          } else {
+            console.log(`  IP rejetée (Docker ou loopback): ${addr.address}`);
           }
         }
       }
     }
   }
   
-  console.log("✗ Aucune IP trouvée, retour de 'Non disponible'");
+  console.log("✗ Aucune IP trouvée après toutes les méthodes, retour de 'Non disponible'");
+  console.log("=== Fin de la récupération de l'IP ===");
   return "Non disponible";
 }
 
