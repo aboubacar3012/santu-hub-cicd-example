@@ -107,21 +107,30 @@ Cette application peut être déployée sur n'importe quelle plateforme supporta
 
 ### Déploiement Docker avec accès aux informations de l'hôte
 
-Pour afficher les informations système de l'hôte (et non du conteneur), il faut monter les volumes suivants :
+Pour afficher les informations système de l'hôte (et non du conteneur), il faut utiliser `--pid host` et monter les volumes suivants :
 
 ```bash
 # Construire l'image
 docker build -t santu-hub-cicd:latest .
 
-# Lancer le conteneur avec les volumes montés
-docker run -p 3000:3000 \
+# Lancer le conteneur avec --pid host et les volumes montés
+docker run -d \
+  --name santu-hub-cicd \
+  --hostname $(hostname) \
+  --restart unless-stopped \
+  --privileged \
+  --pid host \
+  -p 3000:3000 \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc:/host/etc:ro \
   santu-hub-cicd:latest
 ```
 
-**Important** : Les volumes `/proc`, `/sys` et `/etc` doivent être montés en lecture seule (`:ro`) pour que l'application puisse lire les informations système de l'hôte plutôt que celles du conteneur.
+**Important** : 
+- `--pid host` est **essentiel** pour accéder aux informations de l'hôte plutôt qu'au conteneur
+- `--privileged` permet un accès complet aux périphériques et capacités du système
+- Les volumes `/proc`, `/sys` et `/etc` doivent être montés en lecture seule (`:ro`) pour que l'application puisse lire les informations système de l'hôte
 
 ### Exemple de déploiement Vercel
 

@@ -344,7 +344,10 @@ info "Déploiement du conteneur..."
 # Lancer le conteneur avec les volumes montés pour accéder aux infos système de l'hôte
 docker run -d \
     --name "$APP_CONTAINER_NAME" \
+    --hostname "$(hostname)" \
     --restart unless-stopped \
+    --privileged \
+    --pid host \
     -p "${APP_PORT}:3000" \
     -v /proc:/host/proc:ro \
     -v /sys:/host/sys:ro \

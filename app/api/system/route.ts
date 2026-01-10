@@ -14,6 +14,24 @@ function isHostMounted(): boolean {
 
 // Fonction pour lire un fichier depuis l'hôte (si monté) ou depuis le conteneur
 function readHostFile(path: string, fallback: () => string): string {
+  // Avec --pid host, /proc/1/root pointe vers la racine de l'hôte
+  // Essayer d'abord cette méthode (plus fiable)
+  if (fs.existsSync("/proc/1/root")) {
+    try {
+      const proc1RootPath = `/proc/1/root${path}`;
+      if (fs.existsSync(proc1RootPath)) {
+        const content = fs.readFileSync(proc1RootPath, "utf-8");
+        if (content && content.trim().length > 0) {
+          console.log(`✓ Lecture depuis /proc/1/root: ${path}`);
+          return content.trim();
+        }
+      }
+    } catch (error) {
+      // Continuer avec les autres méthodes
+    }
+  }
+  
+  // Essayer avec les volumes montés
   const hostPath = `${HOST_ROOT}${path}`;
   
   if (isHostMounted()) {
@@ -21,7 +39,7 @@ function readHostFile(path: string, fallback: () => string): string {
       if (fs.existsSync(hostPath)) {
         const content = fs.readFileSync(hostPath, "utf-8");
         if (content && content.trim().length > 0) {
-          console.log(`✓ Lecture depuis l'hôte: ${hostPath}`);
+          console.log(`✓ Lecture depuis l'hôte (volume): ${hostPath}`);
           return content.trim();
         }
       }
