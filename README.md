@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Santu Hub - Application de Test CICD 🚀
 
-## Getting Started
+Application Next.js simple conçue pour tester et valider les pipelines de déploiement continu (CI/CD). Cette application affiche les informations système de l'environnement d'exécution, ce qui permet de vérifier facilement que les déploiements fonctionnent correctement sur différentes plateformes.
 
-First, run the development server:
+## 📋 Fonctionnalités
+
+- **Message de bienvenue** : Interface simple et claire
+- **Informations système** : Affichage en temps réel des caractéristiques de l'environnement d'exécution :
+  - Système d'exploitation et version
+  - Architecture du processeur
+  - Modèle du CPU
+  - Mémoire totale et disponible
+  - Temps d'activité (uptime)
+  - Nom de l'hôte
+
+## 🛠️ Stack Technique
+
+- **Framework** : [Next.js](https://nextjs.org) 16.1.1
+- **React** : 19.2.3
+- **Styling** : Tailwind CSS 4.1.18
+- **TypeScript** : Support complet
+- **Fonts** : Geist Sans & Geist Mono
+
+## 🚀 Démarrage Rapide
+
+### Prérequis
+
+- Node.js 18.17.0 ou supérieur
+- pnpm, npm, yarn ou bun
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Installer les dépendances
+pnpm install
+# ou
+npm install
+# ou
+yarn install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Développement
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Lancer le serveur de développement
+pnpm dev
+# ou
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur pour voir l'application.
 
-## Learn More
+### Build de Production
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Créer une build de production
+pnpm build
+# ou
+npm run build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Démarrer le serveur de production
+pnpm start
+# ou
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🧪 Utilisation pour les Tests CICD
 
-## Deploy on Vercel
+Cette application est idéale pour :
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Valider les pipelines CI/CD** : Vérifier que le build et le déploiement fonctionnent correctement
+- **Tester différents environnements** : Confirmer que l'application s'exécute sur différentes plateformes
+- **Surveiller les déploiements** : Les informations système permettent de vérifier l'environnement cible
+- **Démonstrations** : Exemple simple pour présenter les capacités de déploiement continu
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Structure du Projet
+
+```
+santu-hub-cicd-example/
+├── app/
+│   ├── layout.tsx      # Layout principal de l'application
+│   ├── page.tsx         # Page d'accueil avec les infos système
+│   └── globals.css      # Styles globaux avec Tailwind CSS
+├── public/              # Fichiers statiques
+├── next.config.ts       # Configuration Next.js
+├── postcss.config.mjs   # Configuration PostCSS pour Tailwind
+└── package.json         # Dépendances du projet
+```
+
+## 🔧 Configuration
+
+L'application utilise Webpack au lieu de Turbopack pour éviter les problèmes de compatibilité avec Tailwind CSS v4. Pour modifier cela, éditez le script `dev` dans `package.json`.
+
+## 📝 Notes
+
+- L'application utilise le module Node.js `os` pour récupérer les informations système
+- Les informations sont générées côté serveur (Server Components)
+- L'interface supporte le mode sombre automatique
+
+## 🚢 Déploiement
+
+Cette application peut être déployée sur n'importe quelle plateforme supportant Next.js :
+
+- **Vercel** : Déploiement automatique depuis Git
+- **Docker** : Créez un Dockerfile pour containeriser l'application
+- **Autres plateformes** : Netlify, AWS, Azure, etc.
+
+### Exemple de déploiement Vercel
+
+```bash
+vercel
+```
+
+## 📄 Licence
+
+Ce projet est un exemple de test et peut être utilisé librement.
