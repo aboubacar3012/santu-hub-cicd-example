@@ -28,22 +28,13 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Installation de pnpm et nsenter pour le runner
-RUN npm install -g pnpm@8.6.7 && \
-    apk add --no-cache util-linux
+# Installation de nsenter pour le runner
+RUN apk add --no-cache util-linux
 
-# Copier les fichiers nécessaires depuis le builder
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+# Copier les fichiers standalone depuis le builder
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Installer uniquement les dépendances de production
-# Utiliser --no-store-dir pour éviter de stocker dans le store global
-# et nettoyer le cache après installation
-RUN pnpm install --prod --frozen-lockfile --no-store-dir && \
-    rm -rf /root/.local/share/pnpm/store 2>/dev/null || true && \
-    rm -rf /tmp/*
 
 USER nextjs
 
@@ -55,8 +46,8 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV NODE_ENV=production
 
-# Commande de démarrage
-CMD ["pnpm", "start"]
+# Commande de démarrage (utiliser node directement depuis standalone)
+CMD ["node", "server.js"]
 
 # Commandes utiles:
 # docker build -t santu-hub-cicd:latest .

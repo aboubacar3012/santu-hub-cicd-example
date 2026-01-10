@@ -1,5 +1,4 @@
 import SystemInfo from "./components/SystemInfo";
-import SystemInfo from "./components/SystemInfo";
 import EnvVarsSection from "./components/EnvVarsSection";
 
 export default function Home() {
