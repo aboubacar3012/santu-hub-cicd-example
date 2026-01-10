@@ -908,42 +908,71 @@ function getHostIP(): string {
   return "Non disponible";
 }
 
+// Fonction pour obtenir l'utilisation du disque depuis l'hôte
+function getHostDiskUsage(): number {
+  try {
+    // Utiliser statfs pour obtenir les stats du disque
+    // Essayer d'abord avec /proc/1/root pour accéder au disque de l'hôte
+    let rootPath = "/";
+    if (fs.existsSync("/proc/1/root")) {
+      rootPath = "/proc/1/root/";
+    }
+    
+    try {
+      const stats = fs.statfsSync(rootPath);
+      const total = stats.blocks * stats.bsize;
+      const free = stats.bavail * stats.bsize;
+      const used = total - free;
+      const usage = (used / total) * 100;
+      return Math.min(Math.max(usage, 0), 100);
+    } catch (e: any) {
+      console.log("Erreur statfs:", e.message);
+    }
+    
+    // Fallback: utiliser la commande df si disponible
+    try {
+      const dfResult = execSync("df -h / 2>/dev/null", { encoding: "utf-8", timeout: 2000 });
+      const lines = dfResult.trim().split("\n");
+      if (lines.length >= 2) {
+        const parts = lines[1].trim().split(/\s+/);
+        if (parts.length >= 5) {
+          // Format: Filesystem Size Used Avail Use% Mounted on
+          // parts[4] contient le pourcentage avec %
+          const usageStr = parts[4].replace("%", "");
+          const usage = parseFloat(usageStr);
+          if (!isNaN(usage)) {
+            return Math.min(Math.max(usage, 0), 100);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.log("Erreur df:", e.message);
+    }
+  } catch (error: any) {
+    console.log("Erreur lors de la récupération de l'utilisation disque:", error.message);
+  }
+  
+  return 0;
+}
+
 export async function GET() {
   try {
     const hostMounted = isHostMounted();
     console.log("Volumes hôte montés?", hostMounted);
 
-    const cpuInfo = getHostCPUInfo();
     const memory = getHostMemory();
-    const uptime = getHostUptime();
-    const hostname = getHostHostname();
-    const osInfo = getHostOS();
-    const loadAvg = getHostLoadAvg();
     const cpuUsage = getHostCPUUsage();
-    const arch = getHostArch();
-    const localIP = getHostIP();
+    const diskUsage = getHostDiskUsage();
 
     return NextResponse.json({
-      os: {
-        type: osInfo.type,
-        release: osInfo.release,
-        arch,
-      },
-      cpu: {
-        model: cpuInfo.model,
-        count: cpuInfo.count,
-      },
       memory: {
         total: memory.total,
         free: memory.free,
         available: memory.available,
-        used: memory.total - memory.available, // Utiliser available au lieu de free
+        used: memory.total - memory.available,
       },
-      uptime,
-      hostname,
-      localIP,
-      loadAvg,
-      cpuUsage, // Ajouter l'utilisation CPU réelle
+      cpuUsage,
+      diskUsage,
       hostMounted,
     });
   } catch (error) {

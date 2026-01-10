@@ -1,3 +1,5 @@
+import SystemInfo from "./components/SystemInfo";
+import SystemInfo from "./components/SystemInfo";
 import EnvVarsSection from "./components/EnvVarsSection";
 
 export default function Home() {
@@ -20,6 +22,9 @@ export default function Home() {
             <span className="font-medium">Application opérationnelle</span>
           </div>
         </div>
+
+        {/* System Information (Memory, CPU, OS, etc.) */}
+        <SystemInfo />
 
         {/* Environment Variables Section */}
         <EnvVarsSection />
