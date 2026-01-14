@@ -1,6 +1,5 @@
 name: Deploy
 
-# Ce workflow se déclenche après la réussite du workflow Build
 on:
   workflow_run:
     workflows: ["Build"]
@@ -9,58 +8,54 @@ on:
     branches:
       - main
 
-# Variables d'environnement partagées par tous les jobs
 env:
-  REGISTRY: ghcr.io # GitHub Container Registry - où sont stockées nos images Docker
-  IMAGE_NAME: ${{ github.repository }} # Nom du repository GitHub (ex: aboubacar3012/santu-hub-cicd-example)
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Déploiement de l'application sur le serveur de production
   deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      # Se connecter au serveur et déployer l'application
-      - name: Deploy to production server
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy to production server (SSH password)
         shell: bash
         run: |
           set -euo pipefail
 
-          # Créer le dossier SSH et configurer la clé privée
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          CONTAINER_NAME="${{ github.event.repository.name }}"
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
-          # Se connecter au serveur production via SSH et exécuter les commandes de déploiement
-          # ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} << EOF
-          ssh -tt -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p 22 ip172-18-1-33-d5jkq4469qi000af7g1g@direct.labs.play-with-docker.com
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh \
+            -o StrictHostKeyChecking=no \
+            -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} << EOF
 
             set -e
-            
-            CONTAINER_NAME="${{ github.event.repository.name }}"
-            IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            
+
             echo "Authentification à GitHub Container Registry..."
             echo "${{ secrets.PAT_GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-            
+
             echo "Arrêt et suppression du conteneur existant s'il existe..."
             docker stop $CONTAINER_NAME || true
             docker rm $CONTAINER_NAME || true
             docker rmi $IMAGE_TAG || true
-            
+
             echo "Récupération de l'image..."
             docker pull $IMAGE_TAG
-            
+
             echo "Démarrage du conteneur..."
             docker run -d --name $CONTAINER_NAME -p 3000:3000 --restart unless-stopped $IMAGE_TAG
 
             echo "Vérification du statut du conteneur..."
             docker ps | grep $CONTAINER_NAME
           EOF
-          echo "Déploiement terminé"
 
-      # Message de succès
+          echo "Déploiement terminé ✅"
+
       - name: Deployment success
         run: echo "Déploiement terminé avec succès."
         if: success()

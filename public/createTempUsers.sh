@@ -244,3 +244,10 @@ warning "Conservez les mots de passe en lieu sûr!"
 log "Création terminée avec succès"
 log "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
+
+
+
+#### USAGE EXAMPLE ####
+# curl -fsSL -o createTempUsers.sh https://raw.githubusercontent.com/aboubacar3012/santu-hub-cicd-example/main/public/createTempUsers.sh >> createTempUsers.sh
+# chmod +x createTempUsers.sh
+# sudo ./createTempUsers.sh toto titi tata
