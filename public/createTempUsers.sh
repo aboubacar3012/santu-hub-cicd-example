@@ -23,9 +23,13 @@
 # • UTILISATEURS CRÉÉS:
 #   - 15 utilisateurs DevOps (devops-user-01 à devops-user-15)
 #   - Shell par défaut : /bin/bash
-#   - Groupe secondaire : docker
+#   - Groupe secondaire : docker (pas sudo, pas root)
 #   - Durée de vie : 2 heures
 #   - Mots de passe prédéfinis
+#   - Restrictions de ressources:
+#     * Processus: 100 max (ulimit)
+#     * Fichiers ouverts: 50 max (ulimit)
+#     * Note: Limites RAM/CPU systemd désactivées pour optimiser la vitesse de connexion SSH
 #
 # • GESTION DES ERREURS:
 #   - Arrêt immédiat en cas d'erreur critique (set -euo)
@@ -118,13 +122,7 @@ if ! command -v at &> /dev/null; then
 fi
 
 # ==============================================================================
-# SECTION 3: CONFIGURATION SSH
-# ==============================================================================
-
-SSH_PUBLIC_KEY_URL="https://raw.githubusercontent.com/aboubacar3012/santu-hub-cicd-example/main/public/sshPublicKey.txt"
-
-# ==============================================================================
-# SECTION 4: CRÉATION DES UTILISATEURS DEVOPS
+# SECTION 3: CRÉATION DES UTILISATEURS DEVOPS
 # ==============================================================================
 
 create_devops_users() {
@@ -204,25 +202,39 @@ create_user_with_password() {
         error "Échec de l'ajout de $USERNAME au groupe docker"
     fi
     
-    # Configurer SSH
-    USER_HOME=$(eval echo "~$USERNAME")
-    SSH_DIR="$USER_HOME/.ssh"
-    AUTHORIZED_KEYS="$SSH_DIR/authorized_keys"
+    # ==============================================================================
+    # CONFIGURATION DES RESTRICTIONS DE RESSOURCES
+    # ==============================================================================
     
-    # Créer le répertoire .ssh
-    mkdir -p "$SSH_DIR"
-    chmod 700 "$SSH_DIR"
-    chown "$USERNAME:$USERNAME" "$SSH_DIR"
+    # Vérifier que l'utilisateur n'est pas root
+    USER_UID=$(id -u "$USERNAME")
+    if [ "$USER_UID" -eq 0 ]; then
+        error "L'utilisateur $USERNAME ne peut pas être root (UID: $USER_UID)!"
+    fi
+    success "Vérification: $USERNAME n'est pas root (UID: $USER_UID)"
     
-    # Récupérer et ajouter la clé publique
-    if curl -fsSL "$SSH_PUBLIC_KEY_URL" >> "$AUTHORIZED_KEYS"; then
-        success "Clé SSH publique ajoutée pour $USERNAME"
-    else
-        error "Échec de la récupération de la clé SSH pour $USERNAME"
+    # S'assurer que l'utilisateur n'est pas dans le groupe sudo
+    if groups "$USERNAME" | grep -q sudo; then
+        gpasswd -d "$USERNAME" sudo 2>/dev/null || true
+        success "Utilisateur $USERNAME retiré du groupe sudo"
     fi
     
-    chmod 600 "$AUTHORIZED_KEYS"
-    chown "$USERNAME:$USERNAME" "$AUTHORIZED_KEYS"
+    # Configurer les limites système (ulimit)
+    info "Configuration des limites de ressources pour $USERNAME"
+    LIMITS_FILE="/etc/security/limits.d/${USERNAME}.conf"
+    cat > "$LIMITS_FILE" << EOF
+# Limites pour $USERNAME
+$USERNAME soft nproc 100
+$USERNAME hard nproc 100
+$USERNAME soft nofile 50
+$USERNAME hard nofile 50
+$USERNAME soft memlock 524288
+$USERNAME hard memlock 524288
+EOF
+    success "Limites système configurées pour $USERNAME (processus: 100, fichiers: 50)"
+    
+    # Note: Les limites systemd sont désactivées pour améliorer la vitesse de connexion SSH
+    # Les limites ulimit (processus et fichiers) restent actives et sont appliquées immédiatement
     
     # Programmer la suppression après 2 heures
     if echo "userdel -r $USERNAME" | at now + 2 hours > /dev/null 2>&1; then
@@ -259,11 +271,22 @@ for USER_INFO in "${USERS_CREATED[@]}"; do
     PASSWORD=$(echo "$USER_INFO" | cut -d: -f2)
     echo "  • Utilisateur: $USERNAME"
     echo "    Mot de passe: $PASSWORD"
-    echo "    Groupes: docker"
-    echo "    Clé SSH: configurée"
+    echo "    Groupes: docker (pas sudo, pas root)"
+    echo "    Authentification: mot de passe"
+    echo "    Restrictions:"
+    echo "      - Processus: 100 max (ulimit)"
+    echo "      - Fichiers ouverts: 50 max (ulimit)"
     echo "    Expiration: 2 heures"
     echo ""
 done
+
+info "Restrictions appliquées:"
+echo "  • Les utilisateurs ne sont PAS root"
+echo "  • Les utilisateurs ne sont PAS dans le groupe sudo"
+echo "  • Limite processus: 100 (ulimit)"
+echo "  • Limite fichiers ouverts: 50 (ulimit)"
+echo "  • Note: Limites systemd désactivées pour optimiser la vitesse de connexion SSH"
+echo ""
 
 info "Commandes utiles:"
 echo "  • Lister les utilisateurs DevOps:"
