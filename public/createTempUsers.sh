@@ -7,7 +7,7 @@
 #
 # FONCTIONNALITÉS PRINCIPALES:
 # ============================
-# 1. Création d'utilisateurs avec mot de passe généré aléatoirement
+# 1. Création des 15 utilisateurs DevOps avec mots de passe spécifiques
 # 2. Ajout au groupe docker
 # 3. Programmation de la suppression automatique après 2 heures
 # 4. Vérification des prérequis (root, groupe docker, at)
@@ -21,10 +21,11 @@
 #   - Commande 'at' installée pour la programmation
 #
 # • UTILISATEURS CRÉÉS:
+#   - 15 utilisateurs DevOps (devops-user-01 à devops-user-15)
 #   - Shell par défaut : /bin/bash
 #   - Groupe secondaire : docker
 #   - Durée de vie : 2 heures
-#   - Mot de passe généré aléatoirement (12 caractères)
+#   - Mots de passe prédéfinis
 #
 # • GESTION DES ERREURS:
 #   - Arrêt immédiat en cas d'erreur critique (set -euo)
@@ -37,10 +38,10 @@
 # • Commande 'at' installée (pour la programmation)
 #
 # Usage:
-#   sudo ./createTempUsers.sh user1 user2 user3
+#   sudo ./createTempUsers.sh  # Crée les 15 utilisateurs DevOps
 #
-# Exemples:
-#   sudo ./createTempUsers.sh alice bob charlie
+# Exemple:
+#   sudo ./createTempUsers.sh  # Crée devops-user-01 à devops-user-15
 #
 # Auteur : Inspiré de deploy.sh
 # ==============================================================================
@@ -116,11 +117,6 @@ if ! command -v at &> /dev/null; then
     error "La commande 'at' n'est pas installée. Installez-la avec : apt install at"
 fi
 
-# Vérifier que des utilisateurs sont fournis
-if [ $# -eq 0 ]; then
-    error "Aucun utilisateur fourni. Usage: $0 user1 user2 ..."
-fi
-
 # ==============================================================================
 # SECTION 3: CONFIGURATION SSH
 # ==============================================================================
@@ -128,33 +124,68 @@ fi
 SSH_PUBLIC_KEY_URL="https://raw.githubusercontent.com/aboubacar3012/santu-hub-cicd-example/main/public/sshPublicKey.txt"
 
 # ==============================================================================
-# SECTION 4: FONCTION POUR GÉNÉRER UN MOT DE PASSE
+# SECTION 4: CRÉATION DES UTILISATEURS DEVOPS
 # ==============================================================================
 
-generate_password() {
-    # Générer un mot de passe aléatoire de 12 caractères
-    openssl rand -base64 12 | tr -d "=+/" | cut -c1-12
+create_devops_users() {
+    log_section "Création des utilisateurs DevOps temporaires"
+    
+    # Définir les utilisateurs et leurs mots de passe
+    declare -A DEVOPS_USERS=(
+        ["devops-user-01"]="DevOps#7M92"
+        ["devops-user-02"]="DevOps@4Q81"
+        ["devops-user-03"]="DevOps!9K36"
+        ["devops-user-04"]="DevOps\$2R75"
+        ["devops-user-05"]="DevOps%8A64"
+        ["devops-user-06"]="DevOps&5Z19"
+        ["devops-user-07"]="DevOps#3J88"
+        ["devops-user-08"]="DevOps@6T42"
+        ["devops-user-09"]="DevOps!1W97"
+        ["devops-user-10"]="DevOps\$9H24"
+        ["devops-user-11"]="DevOps%4P63"
+        ["devops-user-12"]="DevOps&7C58"
+        ["devops-user-13"]="DevOps#2L91"
+        ["devops-user-14"]="DevOps@8X46"
+        ["devops-user-15"]="DevOps!5B73"
+    )
+    
+    for USERNAME in "${!DEVOPS_USERS[@]}"; do
+        PASSWORD="${DEVOPS_USERS[$USERNAME]}"
+        create_user_with_password "$USERNAME" "$PASSWORD"
+        USERS_CREATED+=("$USERNAME:$PASSWORD")
+    done
+    
+    return 0
 }
 
 # ==============================================================================
-# SECTION 4: CRÉATION DES UTILISATEURS
+# SECTION 4.5: FONCTION POUR CRÉER UN UTILISATEUR AVEC MOT DE PASSE
 # ==============================================================================
 
-log_section "Création des utilisateurs temporaires"
-
-USERS_CREATED=()
-
-for USERNAME in "$@"; do
+create_user_with_password() {
+    local USERNAME="$1"
+    local PASSWORD="$2"
+    
     info "Création de l'utilisateur temporaire : $USERNAME"
     
-    # Vérifier si l'utilisateur existe déjà
+    # Vérifier si l'utilisateur existe déjà et le supprimer
     if id "$USERNAME" > /dev/null 2>&1; then
-        warning "L'utilisateur $USERNAME existe déjà. Ignoré."
-        continue
+        warning "L'utilisateur $USERNAME existe déjà. Suppression en cours..."
+        
+        # Annuler les tâches programmées pour cet utilisateur
+        atq | grep -i "userdel.*$USERNAME" | awk '{print $1}' | xargs -r atrm 2>/dev/null || true
+        
+        # Supprimer l'utilisateur et son répertoire home
+        if userdel -r "$USERNAME" 2>/dev/null; then
+            success "Utilisateur $USERNAME supprimé"
+        else
+            warning "Échec de la suppression de $USERNAME, tentative de suppression forcée..."
+            # Tentative de suppression forcée
+            killall -u "$USERNAME" 2>/dev/null || true
+            sleep 1
+            userdel -rf "$USERNAME" 2>/dev/null || true
+        fi
     fi
-    
-    # Générer un mot de passe
-    PASSWORD=$(generate_password)
     
     # Créer l'utilisateur
     if useradd -m -s /bin/bash "$USERNAME"; then
@@ -200,14 +231,21 @@ for USERNAME in "$@"; do
         warning "Échec de la programmation de la suppression pour $USERNAME"
     fi
     
-    # Stocker les informations
-    USERS_CREATED+=("$USERNAME:$PASSWORD")
-    
     echo ""
-done
+}
 
 # ==============================================================================
-# SECTION 5: RÉSUMÉ FINAL
+# SECTION 5: EXÉCUTION PRINCIPALE
+# ==============================================================================
+
+# Initialiser le tableau des utilisateurs créés
+USERS_CREATED=()
+
+# Créer les utilisateurs DevOps avec leurs mots de passe spécifiques
+create_devops_users
+
+# ==============================================================================
+# SECTION 6: RÉSUMÉ FINAL
 # ==============================================================================
 
 log_section "Utilisateurs temporaires créés"
@@ -228,14 +266,14 @@ for USER_INFO in "${USERS_CREATED[@]}"; do
 done
 
 info "Commandes utiles:"
-echo "  • Lister les utilisateurs:"
-echo "    cat /etc/passwd | grep -E '($(echo "$@" | tr ' ' '|'))'"
+echo "  • Lister les utilisateurs DevOps:"
+echo "    cat /etc/passwd | grep devops-user"
 echo ""
 echo "  • Vérifier les tâches programmées:"
 echo "    atq"
 echo ""
 echo "  • Supprimer manuellement un utilisateur:"
-echo "    userdel -r username"
+echo "    userdel -r devops-user-XX"
 echo ""
 
 warning "Les utilisateurs seront automatiquement supprimés après 2 heures."
@@ -248,6 +286,9 @@ echo ""
 
 
 #### USAGE EXAMPLE ####
-# curl -fsSL -o createTempUsers.sh https://raw.githubusercontent.com/aboubacar3012/santu-hub-cicd-example/main/public/createTempUsers.sh >> createTempUsers.sh
+# Télécharger le script:
+# curl -fsSL -o createTempUsers.sh https://raw.githubusercontent.com/aboubacar3012/santu-hub-cicd-example/main/public/createTempUsers.sh
 # chmod +x createTempUsers.sh
-# sudo ./createTempUsers.sh toto titi tata
+#
+# Créer les 15 utilisateurs DevOps:
+# sudo ./createTempUsers.sh
