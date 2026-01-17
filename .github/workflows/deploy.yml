@@ -1,13 +1,13 @@
 name: Deploy Santu Hub CICD
 
+# Ce workflow se déclenche manuellement
 on:
-  workflow_run:
-    workflows: ["Build Santu Hub CICD"]
-    types:
-      - completed
-    branches:
-      - main
-      - develop
+  workflow_dispatch:
+  # Déclenchement automatique (commenté)
+  # push:
+  #   branches:
+  #     - main
+  #     - develop
 
 env:
   REGISTRY: ghcr.io
@@ -16,7 +16,6 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Install sshpass
