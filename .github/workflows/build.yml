@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - develop
 
 # Variables d'environnement partagées par tous les jobs
 env:
@@ -26,29 +27,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Supprimer l'ancien fichier .env s'il existe
-      - name: Clean old .env file
-        run: rm -f .env
-
-      # Créer le fichier .env avec les variables GitHub
-      - name: Create .env file from GitHub variables
-        run: |
-          {
-            echo "VARIABLE1=${VARIABLE1}"
-            echo "VARIABLE2=${VARIABLE2}"
-            echo "VARIABLE3=${VARIABLE3}"
-          } > .env
-        env:
-          VARIABLE1: ${{ vars.VARIABLE1 }}
-          VARIABLE2: ${{ vars.VARIABLE2 }}
-          VARIABLE3: ${{ vars.VARIABLE3 }}
-
-      # Afficher le contenu du fichier .env pour débugger
-      - name: Debug .env
-        run: |
-          echo "------ Contenu de .env ------"
-          cat .env
-          echo "----------------------------------------"
+      # Note: Les variables d'environnement seront injectées au moment du docker run
+      # Elles ne sont plus incluses dans l'image Docker
 
       # Se connecter au registre Docker GitHub Container Registry
       - name: Log in to GitHub Container Registry

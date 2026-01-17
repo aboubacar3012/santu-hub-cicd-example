@@ -7,6 +7,7 @@ on:
       - completed
     branches:
       - main
+      - develop
 
 env:
   REGISTRY: ghcr.io
@@ -48,7 +49,15 @@ jobs:
             docker pull $IMAGE_TAG
 
             echo "Démarrage du conteneur..."
-            docker run -d --name $CONTAINER_NAME -p ${{ vars.CONTAINER_PORT }}:${{ vars.CONTAINER_PORT }} --restart unless-stopped $IMAGE_TAG
+            # docker run -d --name $CONTAINER_NAME -p ${{ vars.CONTAINER_PORT }}:${{ vars.CONTAINER_PORT }} --restart unless-stopped $IMAGE_TAG
+
+            docker run -d --name $CONTAINER_NAME \
+              -p ${{ vars.CONTAINER_PORT }}:${{ vars.CONTAINER_PORT }} \
+              -e VARIABLE1="${{ vars.VARIABLE1 }}" \
+              -e VARIABLE2="${{ vars.VARIABLE2 }}" \
+              -e VARIABLE3="${{ vars.VARIABLE3 }}" \
+              --restart unless-stopped \
+              $IMAGE_TAG
 
             echo "Vérification du statut du conteneur..."
             docker ps | grep $CONTAINER_NAME

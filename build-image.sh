@@ -53,19 +53,8 @@ fi
 echo "Construction de l'image santu-hub-cicd avec le tag: $TAG"
 
 # *************************** ENVIRONNEMENT ****************************
-# Définir la racine du projet
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-# Charger les variables d'environnement à partir du fichier .env à la racine du projet
-if [ -f "$PROJECT_ROOT/.env" ]; then
-  echo "Chargement des variables d'environnement depuis $PROJECT_ROOT/.env"
-  
-  # Charger toutes les variables d'environnement en excluant les commentaires
-  set -a
-  source <(grep -v '^#' "$PROJECT_ROOT/.env" | grep -v '^$' | sed 's/\r$//')
-  set +a
-else
-  echo "Fichier .env non trouvé à la racine du projet. La publication nécessite PAT_GITHUB_TOKEN."
-fi
+# Note: Les variables d'environnement doivent être passées directement au script
+# Pour la publication locale, PAT_GITHUB_TOKEN doit être défini comme variable d'environnement
 
 # *************************** CONSTRUCTION DOCKER ****************************
 # Construire l'image
@@ -94,12 +83,13 @@ if [ -n "$GITHUB_ACTIONS" ]; then
 else
   # En environnement local, vérifier si le PAT_GITHUB_TOKEN est disponible dans les variables d'environnement
   if [ -z "$PAT_GITHUB_TOKEN" ]; then
-    echo "PAT_GITHUB_TOKEN non trouvé dans le fichier .env. Publication impossible."
+    echo "PAT_GITHUB_TOKEN non trouvé dans les variables d'environnement. Publication impossible."
+    echo "Définissez PAT_GITHUB_TOKEN comme variable d'environnement avant d'exécuter le script."
     exit 1
   fi
 
   # Connexion à GitHub Container Registry localement
-  echo "Connexion à GitHub Container Registry avec le token PAT depuis .env..."
+  echo "Connexion à GitHub Container Registry avec le token PAT..."
   echo $PAT_GITHUB_TOKEN | docker login ${REGISTRY} -u aboubacar3012 --password-stdin
 fi
 
