@@ -6,7 +6,7 @@
 # Définir les variables
 IMAGE_NAME="santu-hub-cicd"
 REGISTRY="ghcr.io"
-REPO="aboubacar3012/santu-hub-cicd-example"
+REPO="aboubacar3012/santu-hub-cicd"
 # Format de date JJ-MM-AA-HH-MM
 DATE_FORMAT=$(LC_TIME=fr_FR.UTF-8 TZ=Europe/Paris date +"%a_%d_%B_%Y_%Hh%M")
 
